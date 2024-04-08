@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aws-auth
+  namespace: kube-system
+data:
+  mapUsers: |
+    - userarn: arn:aws:iam::194775815513:user/ankita_shanbhag
+      username: ankita_shanbhag
+      groups:
+        - system:masters
