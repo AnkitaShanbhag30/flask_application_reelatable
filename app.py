@@ -13,7 +13,7 @@ def check_endpoint():
 def lookup_movie():
     data = request.json  # Get JSON data sent from Flutter app
     movie_name = data.get('movieName', '')
-    print(f"Looking up the movie: {movie_name}")
+    print(f"Looking up the movie - name: {movie_name}")
     # Respond with a JSON message
     return jsonify({"message": "Looking up the movie"})
 
