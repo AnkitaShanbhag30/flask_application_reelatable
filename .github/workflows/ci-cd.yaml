@@ -13,26 +13,37 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v2
 
-    - name: Set up Cloud SDK
+    - name: Set up Google Cloud SDK
       uses: google-github-actions/setup-gcloud@v0.4.0
       with:
         service_account_key: ${{ secrets.GKE_KEY }}
         project_id: ${{ secrets.GKE_PROJECT }}
 
-    - name: Build Docker image
+    - name: Authenticate with Google Cloud
       run: |
-        docker build -t gcr.io/${{ secrets.GKE_PROJECT }}/flask-reelatable:$GITHUB_SHA .
-    
-    - name: Push Docker image to Google Container Registry
-      run: |
-        gcloud auth configure-docker
-        docker push gcr.io/${{ secrets.GKE_PROJECT }}/flask-reelatable:$GITHUB_SHA
+        echo '${{ secrets.GKE_KEY }}' | gcloud auth activate-service-account --key-file=-
+        gcloud config set project ${{ secrets.GKE_PROJECT }}
 
-    - name: Set up kubectl
+    - name: Configure Docker to use gcloud as a credential helper
+      run: gcloud auth configure-docker --quiet
+
+    - name: List Clusters (Debugging)
+      run: gcloud container clusters list --project ${{ secrets.GKE_PROJECT }}
+
+    - name: Get Cluster Credentials
       run: |
-        gcloud components update kubectl
-        gcloud container clusters get-credentials reelatable-cluster --zone us-west1 --project ${{ secrets.GKE_PROJECT }}
+        gcloud container clusters get-credentials reelatable-cluster --region us-west1 --project ${{ secrets.GKE_PROJECT }}
+
+    - name: Build and Push Docker image
+      run: |
+        docker build -t gcr.io/${{ secrets.GKE_PROJECT }}/flask-reelatable:latest .
+        docker push gcr.io/${{ secrets.GKE_PROJECT }}/flask-reelatable:latest
 
     - name: Deploy to Kubernetes
       run: |
-        kubectl set image deployment/flask-reelatable flask-reelatable=gcr.io/${{ secrets.GKE_PROJECT }}/flask-reelatable:$GITHUB_SHA
+        kubectl rollout restart deployment/flask-reelatable
+
+    - name: Verify Deployment
+      run: |
+        kubectl get deployments
+        kubectl describe deployments/flask-reelatable
