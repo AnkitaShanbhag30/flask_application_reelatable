@@ -41,6 +41,7 @@ jobs:
 
     - name: Deploy to Kubernetes
       run: |
+        gcloud components install gke-gcloud-auth-plugin
         kubectl rollout restart deployment/flask-reelatable
 
     - name: Verify Deployment
