@@ -31,7 +31,7 @@ jobs:
     - name: Set up kubectl
       run: |
         gcloud components update kubectl
-        gcloud container clusters get-credentials your-cluster-name --zone your-zone --project ${{ secrets.GKE_PROJECT }}
+        gcloud container clusters get-credentials reelatable-cluster --zone us-west1 --project ${{ secrets.GKE_PROJECT }}
 
     - name: Deploy to Kubernetes
       run: |
