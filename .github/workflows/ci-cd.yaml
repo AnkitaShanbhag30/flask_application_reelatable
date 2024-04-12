@@ -27,13 +27,14 @@ jobs:
       - name: Configure Docker to use gcloud as a credential helper
         run: gcloud auth configure-docker --quiet
 
-      - name: List Clusters (Debugging)
-        run: gcloud container clusters list --project ${{ secrets.GKE_PROJECT }}
+      - name: Install GKE gcloud auth plugin
+        run: |
+          gcloud components install gke-gcloud-auth-plugin --quiet
+          gcloud components list
 
       - name: Get Cluster Credentials
         run: |
           gcloud container clusters get-credentials reelatable-cluster --region us-west1 --project ${{ secrets.GKE_PROJECT }}
-          gcloud components install gke-gcloud-auth-plugin --quiet
 
       - name: Build and Push Docker image
         run: |
