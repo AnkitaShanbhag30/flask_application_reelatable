@@ -1,0 +1,37 @@
+name: Deploy to GKE on PR
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v0.4.0
+      with:
+        service_account_key: ${{ secrets.GKE_KEY }}
+        project_id: ${{ secrets.GKE_PROJECT }}
+
+    - name: Build Docker image
+      run: |
+        docker build -t gcr.io/${{ secrets.GKE_PROJECT }}/flask-reelatable:$GITHUB_SHA .
+    
+    - name: Push Docker image to Google Container Registry
+      run: |
+        gcloud auth configure-docker
+        docker push gcr.io/${{ secrets.GKE_PROJECT }}/flask-reelatable:$GITHUB_SHA
+
+    - name: Set up kubectl
+      run: |
+        gcloud components update kubectl
+        gcloud container clusters get-credentials your-cluster-name --zone your-zone --project ${{ secrets.GKE_PROJECT }}
+
+    - name: Deploy to Kubernetes
+      run: |
+        kubectl set image deployment/flask-reelatable flask-reelatable=gcr.io/${{ secrets.GKE_PROJECT }}/flask-reelatable:$GITHUB_SHA
