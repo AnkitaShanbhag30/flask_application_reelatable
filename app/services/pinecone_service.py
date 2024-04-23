@@ -15,7 +15,7 @@ if not hf_token:
 embeddings_model = SentenceTransformer('mixedbread-ai/mxbai-embed-large-v1', hf_token)
 
 # Constants
-INDEX_DIMENSION = 1024  # Example dimension, set it to your index dimension
+INDEX_DIMENSION = 1024
 CHAR_LIMIT = 5000
 keys_to_process = ['beliefs', 'desires', 'personality_traits', 'flaws']
 
