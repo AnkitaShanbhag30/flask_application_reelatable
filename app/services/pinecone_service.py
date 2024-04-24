@@ -3,6 +3,8 @@ from sentence_transformers import SentenceTransformer
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from collections import Counter
+
+from sklearn.metrics import silhouette_score
 from app.utils.helpers import load_pca_model
 import numpy as np
 from . import index
@@ -256,6 +258,27 @@ def get_recommendations(movie_titles, num_movies, alpha):
     results = search_movies(combined_traits, plotlines, filter=query_filter, top_k=num_movies, alpha=alpha)
 
     return results
+def find_optimal_num_clusters(embeddings_array, max_clusters=5):
+    """
+    Find the optimal number of clusters using the elbow method or silhouette score.
+    """
+    if len(embeddings_array) <= 1:
+        return 1  # Only one embedding, so only one cluster
+
+    if len(embeddings_array) <= max_clusters:
+        return len(embeddings_array)  # Fewer embeddings than the maximum allowed clusters
+
+    # Calculate silhouette scores for different numbers of clusters
+    silhouette_scores = []
+    for n_clusters in range(2, max_clusters + 1):
+        kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+        cluster_labels = kmeans.fit_predict(embeddings_array)
+        silhouette_avg = silhouette_score(embeddings_array, cluster_labels)
+        silhouette_scores.append(silhouette_avg)
+
+    # Find the optimal number of clusters based on the elbow point or silhouette score
+    optimal_num_clusters = silhouette_scores.index(max(silhouette_scores)) + 2  # Add 2 because the loop starts from 2
+    return optimal_num_clusters
 
 def find_representative_traits_from_embeddings(category_embeddings, traits_dict):
     representative_traits = {}
@@ -266,39 +289,47 @@ def find_representative_traits_from_embeddings(category_embeddings, traits_dict)
             embeddings_array = np.array(embeddings_list)
 
             # Decide the number of clusters based on the number of embeddings
-            if len(embeddings_array) > 2:
-                num_clusters = min(len(embeddings_array) // 3, 5)  # Ensure at least 3 traits per cluster, up to 5 clusters
-                kmeans = KMeans(n_clusters=num_clusters, random_state=42).fit(embeddings_array)
-                largest_cluster_idx = np.argmax(np.bincount(kmeans.labels_))
-                overall_centroid = np.mean(embeddings_array, axis=0)
-                closest_centroid_idx = np.argmin(np.linalg.norm(kmeans.cluster_centers_ - overall_centroid, axis=1))
+            num_clusters = find_optimal_num_clusters(embeddings_array)
+            num_clusters = min(num_clusters, len(embeddings_array) // 3 + 1)
+            kmeans = KMeans(n_clusters=num_clusters, random_state=42).fit(embeddings_array)
+            largest_cluster_idx = np.argmax(np.bincount(kmeans.labels_))
+            overall_centroid = np.mean(embeddings_array, axis=0)
+            closest_centroid_idx = np.argmin(np.linalg.norm(kmeans.cluster_centers_ - overall_centroid, axis=1))
 
-                # Choose the largest or closest cluster to the overall centroid
-                final_cluster_idx = largest_cluster_idx if largest_cluster_idx == closest_centroid_idx else closest_centroid_idx
-                indices = [i for i, label in enumerate(kmeans.labels_) if label == final_cluster_idx]
+            # Choose the largest or closest cluster to the overall centroid
+            final_cluster_idx = largest_cluster_idx if largest_cluster_idx == closest_centroid_idx else closest_centroid_idx
+            indices = [i for i, label in enumerate(kmeans.labels_) if label == final_cluster_idx]
 
-                final_centroid = kmeans.cluster_centers_[final_cluster_idx]
-                closest, _ = min(enumerate(indices), key=lambda x: np.linalg.norm(embeddings_array[x[1]] - final_centroid))
+            final_centroid = kmeans.cluster_centers_[final_cluster_idx]
+            closest, _ = min(enumerate(indices), key=lambda x: np.linalg.norm(embeddings_array[x[1]] - final_centroid))
 
-                representative_traits[key] = {
-                    "representative_trait": traits_dict[key][indices[closest]],
-                    "cluster_traits": [traits_dict[key][i] for i in indices],
-                }
-            elif len(embeddings_array) > 0:
-                # If less than required for multiple clusters, use what's available
-                representative_traits[key] = {
-                    "representative_trait": traits_dict[key][0],
-                    "cluster_traits": [traits_dict[key][i] for i in range(len(embeddings_array))],
-                }
-            else:
-                representative_traits[key] = {
-                    "representative_trait": "No data",
-                    "cluster_traits": [],
-                }
+            clusters = []
+            for cluster_idx in range(num_clusters):
+                cluster_indices = [i for i, label in enumerate(kmeans.labels_) if label == cluster_idx]
+                cluster_traits = [traits_dict[key][i] for i in cluster_indices]
+                clusters.append({
+                    "traits": cluster_traits
+                })
+
+            representative_traits[key] = {
+                "representative_trait": traits_dict[key][indices[closest]],
+                "cluster_traits": [traits_dict[key][i] for i in indices],
+                "clusters": clusters
+            }
+        elif len(embeddings_list) > 0:
+            # If less than required for multiple clusters, use what's available
+            representative_traits[key] = {
+                "representative_trait": traits_dict[key][0],
+                "cluster_traits": [traits_dict[key][i] for i in range(len(embeddings_list))],
+                "clusters": [{
+                    "traits": [traits_dict[key][i] for i in range(len(embeddings_list))]
+                }]
+            }
         else:
             representative_traits[key] = {
                 "representative_trait": "No data",
                 "cluster_traits": [],
+                "clusters": []
             }
 
     return representative_traits
