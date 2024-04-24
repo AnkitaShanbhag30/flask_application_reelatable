@@ -1,3 +1,4 @@
 .env
 reelatable_venv
 reelatable_venv/*
+saved_models/*

@@ -1,5 +1,6 @@
 import os
 from sentence_transformers import SentenceTransformer
+from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from collections import Counter
 from app.utils.helpers import load_pca_model
@@ -12,7 +13,21 @@ if not hf_token:
     raise ValueError("Hugging Face token is not set in environment variables")
 
 # Initialize Sentence Transformer model
-embeddings_model = SentenceTransformer('mixedbread-ai/mxbai-embed-large-v1', hf_token)
+model_name = 'mixedbread-ai/mxbai-embed-large-v1'
+local_model_path = './saved_models/mxbai-embed-large-v1'
+
+def load_model(model_path, model_name):
+    if os.path.exists(model_path):
+        # Load from the local system
+        model = SentenceTransformer(model_path)
+    else:
+        # Download the model and save it locally for future use
+        model = SentenceTransformer(model_name)
+        model.save(model_path)
+    return model
+
+# Load the model
+embeddings_model = load_model(local_model_path, model_name)
 
 # Constants
 INDEX_DIMENSION = 1024
@@ -241,3 +256,65 @@ def get_recommendations(movie_titles, num_movies, alpha):
     results = search_movies(combined_traits, plotlines, filter=query_filter, top_k=num_movies, alpha=alpha)
 
     return results
+
+def find_representative_traits_from_embeddings(category_embeddings, traits_dict):
+    representative_traits = {}
+
+    for key, embeddings_list in category_embeddings.items():
+        if embeddings_list:
+            # Convert list of embeddings to numpy array for processing
+            embeddings_array = np.array(embeddings_list)
+
+            # Decide the number of clusters based on the number of embeddings
+            if len(embeddings_array) > 2:
+                num_clusters = min(len(embeddings_array) // 3, 5)  # Ensure at least 3 traits per cluster, up to 5 clusters
+                kmeans = KMeans(n_clusters=num_clusters, random_state=42).fit(embeddings_array)
+                largest_cluster_idx = np.argmax(np.bincount(kmeans.labels_))
+                overall_centroid = np.mean(embeddings_array, axis=0)
+                closest_centroid_idx = np.argmin(np.linalg.norm(kmeans.cluster_centers_ - overall_centroid, axis=1))
+
+                # Choose the largest or closest cluster to the overall centroid
+                final_cluster_idx = largest_cluster_idx if largest_cluster_idx == closest_centroid_idx else closest_centroid_idx
+                indices = [i for i, label in enumerate(kmeans.labels_) if label == final_cluster_idx]
+
+                final_centroid = kmeans.cluster_centers_[final_cluster_idx]
+                closest, _ = min(enumerate(indices), key=lambda x: np.linalg.norm(embeddings_array[x[1]] - final_centroid))
+
+                representative_traits[key] = {
+                    "representative_trait": traits_dict[key][indices[closest]],
+                    "cluster_traits": [traits_dict[key][i] for i in indices],
+                }
+            elif len(embeddings_array) > 0:
+                # If less than required for multiple clusters, use what's available
+                representative_traits[key] = {
+                    "representative_trait": traits_dict[key][0],
+                    "cluster_traits": [traits_dict[key][i] for i in range(len(embeddings_array))],
+                }
+            else:
+                representative_traits[key] = {
+                    "representative_trait": "No data",
+                    "cluster_traits": [],
+                }
+        else:
+            representative_traits[key] = {
+                "representative_trait": "No data",
+                "cluster_traits": [],
+            }
+
+    return representative_traits
+
+def get_representative_traits(movie_titles):
+    category_embeddings = {key: [] for key in keys_to_process}
+    full_traits_dict = {key: [] for key in keys_to_process}  # To hold all traits for reference
+
+    for title in movie_titles:
+        metadata = get_metadata_by_movie(title)
+        if metadata:
+            traits_dict = extract_traits(metadata, keys_to_process)
+            for key in keys_to_process:
+                if traits_dict[key]:
+                    sparse_embedding = get_sparse_embeddings({key: traits_dict[key]})
+                    if sparse_embedding and 'values' in sparse_embedding:
+                        category_embeddings[key].append(sparse_embedding['values'])
+                        full_traits_dict[key].extend(traits_dict[key])
+    return find_representative_traits_from_embeddings(category_embeddings, full_traits_dict)
