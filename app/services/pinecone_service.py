@@ -288,42 +288,40 @@ def find_representative_traits_from_embeddings(category_embeddings, traits_dict)
             # Convert list of embeddings to numpy array for processing
             embeddings_array = np.array(embeddings_list)
 
-            # Decide the number of clusters based on the number of embeddings
+            # Determine the optimal number of clusters
             num_clusters = find_optimal_num_clusters(embeddings_array)
             num_clusters = min(num_clusters, len(embeddings_array) // 3 + 1)
+
+            # Perform KMeans clustering
             kmeans = KMeans(n_clusters=num_clusters, random_state=42).fit(embeddings_array)
-            largest_cluster_idx = np.argmax(np.bincount(kmeans.labels_))
             overall_centroid = np.mean(embeddings_array, axis=0)
+
+            # Determine the largest or closest cluster to the overall centroid
+            largest_cluster_idx = np.argmax(np.bincount(kmeans.labels_))
             closest_centroid_idx = np.argmin(np.linalg.norm(kmeans.cluster_centers_ - overall_centroid, axis=1))
-
-            # Choose the largest or closest cluster to the overall centroid
             final_cluster_idx = largest_cluster_idx if largest_cluster_idx == closest_centroid_idx else closest_centroid_idx
-            indices = [i for i, label in enumerate(kmeans.labels_) if label == final_cluster_idx]
 
-            final_centroid = kmeans.cluster_centers_[final_cluster_idx]
-            closest, _ = min(enumerate(indices), key=lambda x: np.linalg.norm(embeddings_array[x[1]] - final_centroid))
-
+            # Collect cluster details
             clusters = []
             for cluster_idx in range(num_clusters):
                 cluster_indices = [i for i, label in enumerate(kmeans.labels_) if label == cluster_idx]
                 cluster_traits = [traits_dict[key][i] for i in cluster_indices]
-                clusters.append({
-                    "traits": cluster_traits
-                })
+                clusters.append({"traits": cluster_traits})
 
+            # Identify the representative trait (closest to the centroid of the selected cluster)
+            indices = [i for i, label in enumerate(kmeans.labels_) if label == final_cluster_idx]
+            final_centroid = kmeans.cluster_centers_[final_cluster_idx]
+            closest, _ = min(enumerate(indices), key=lambda x: np.linalg.norm(embeddings_array[x[1]] - final_centroid))
             representative_traits[key] = {
                 "representative_trait": traits_dict[key][indices[closest]],
                 "cluster_traits": [traits_dict[key][i] for i in indices],
                 "clusters": clusters
             }
         elif len(embeddings_list) > 0:
-            # If less than required for multiple clusters, use what's available
             representative_traits[key] = {
                 "representative_trait": traits_dict[key][0],
                 "cluster_traits": [traits_dict[key][i] for i in range(len(embeddings_list))],
-                "clusters": [{
-                    "traits": [traits_dict[key][i] for i in range(len(embeddings_list))]
-                }]
+                "clusters": [{"traits": [traits_dict[key][i] for i in range(len(embeddings_list))]}]
             }
         else:
             representative_traits[key] = {
