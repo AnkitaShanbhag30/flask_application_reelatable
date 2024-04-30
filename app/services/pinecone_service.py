@@ -347,3 +347,25 @@ def get_representative_traits(movie_titles):
                         category_embeddings[key].append(sparse_embedding['values'])
                         full_traits_dict[key].extend(traits_dict[key])
     return find_representative_traits_from_embeddings(category_embeddings, full_traits_dict)
+
+def get_all_movies():
+    """
+    Retrieves all movie titles from the Pinecone index by fetching entries in batches.
+    
+    :return: List of all movie titles.
+    """
+    all_movies = []
+
+    query = {
+        "vector": np.random.rand(INDEX_DIMENSION).tolist(),  # Random vector to form a valid query
+        "top_k": 5000,  # Batch size
+        "include_metadata": True  # Ensure metadata is included in the response
+    }
+
+    result = index.query(**query)
+    if result and 'matches' in result and result['matches']:
+        for match in result['matches']:
+            if 'metadata' in match and 'title' in match['metadata']:
+                all_movies.append(match['metadata']['title'])
+                
+    return all_movies
