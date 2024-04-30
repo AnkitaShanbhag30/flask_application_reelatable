@@ -17,3 +17,10 @@ spec:
         image: gcr.io/reelatable/docker-flask-reelatable:latest
         ports:
         - containerPort: 5000
+          resources:
+          limits:
+            cpu: "1"
+            memory: "512Mi"
+          requests:
+            cpu: "0.5"
+            memory: "256Mi"
