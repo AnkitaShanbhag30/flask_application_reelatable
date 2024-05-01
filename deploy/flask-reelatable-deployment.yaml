@@ -12,15 +12,17 @@ spec:
       labels:
         app: flask-reelatable
     spec:
+      imagePullSecrets:
+      - name: gcr-json-key
       containers:
       - name: flask-reelatable
-        image: gcr.io/reelatable/docker-flask-reelatable:latest
+        image: gcr.io/reelatable-420506/docker-flask-reelatable:202405010012
         ports:
         - containerPort: 5000
-          resources:
+        resources:
           limits:
-            cpu: "1"
-            memory: "512Mi"
+            cpu: "100m"
+            memory: "2Gi"
           requests:
-            cpu: "0.5"
-            memory: "256Mi"
+            cpu: "50m"
+            memory: "1Gi"

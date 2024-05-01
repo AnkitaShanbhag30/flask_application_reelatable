@@ -1,8 +1,6 @@
 import os
 from sentence_transformers import SentenceTransformer
 from sklearn.cluster import KMeans
-from sklearn.decomposition import PCA
-from collections import Counter
 
 from sklearn.metrics import silhouette_score
 from app.utils.helpers import load_pca_model
@@ -15,16 +13,18 @@ if not hf_token:
     raise ValueError("Hugging Face token is not set in environment variables")
 
 # Initialize Sentence Transformer model
-model_name = 'mixedbread-ai/mxbai-embed-large-v1'
-local_model_path = './saved_models/mxbai-embed-large-v1'
+# model_name = 'mixedbread-ai/mxbai-embed-large-v1'
+# local_model_path = './saved_models/mxbai-embed-large-v1'
+model_name = 'Alibaba-NLP/gte-base-en-v1.5'
+local_model_path = './saved_models/gte-base-en-v1.5'
 
 def load_model(model_path, model_name):
     if os.path.exists(model_path):
         # Load from the local system
-        model = SentenceTransformer(model_path)
+        model = SentenceTransformer(model_path, trust_remote_code=True)
     else:
         # Download the model and save it locally for future use
-        model = SentenceTransformer(model_name)
+        model = SentenceTransformer(model_name, trust_remote_code=True)
         model.save(model_path)
     return model
 
@@ -32,7 +32,7 @@ def load_model(model_path, model_name):
 embeddings_model = load_model(local_model_path, model_name)
 
 # Constants
-INDEX_DIMENSION = 1024
+INDEX_DIMENSION = 768
 CHAR_LIMIT = 5000
 keys_to_process = ['beliefs', 'desires', 'personality_traits', 'flaws']
 
