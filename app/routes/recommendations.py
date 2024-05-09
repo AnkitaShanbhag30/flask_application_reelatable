@@ -48,7 +48,7 @@ def search_by_traits():
 
     # Search movies by traits
     try:
-        results = search_movies(traits, texts=[""], filter=None, top_k=num_results, alpha=0.5) # alpha=0.0 ensures that only sparse embeddings of traits are used for this search
+        results = search_movies(traits, texts=[""], filter=None, top_k=num_results, alpha=1.0) # alpha=0.0 ensures that only sparse embeddings of traits are used for this search
         return jsonify(results)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
